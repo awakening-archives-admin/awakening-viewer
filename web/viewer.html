@@ -732,33 +732,37 @@ See https://github.com/adobe-type-tools/cmap-resources
 
     </div> <!-- outerContainer -->
     <div id="printContainer"></div>
-    <script>
-  (async function () {
-    const query = new URLSearchParams(window.location.search);
-    const fileKey = query.get("fileKey");
+<script>
+  async function loadPresignedPDF() {
+    const params = new URLSearchParams(window.location.search);
+    const fileKey = params.get('file');
 
     if (!fileKey) {
-      alert("Missing fileKey");
+      alert("Missing file key in URL");
       return;
     }
 
+    const apiBase = "https://8a73bzipp6.execute-api.us-west-1.amazonaws.com";
+    const url = `${apiBase}/GeneratePresignedUrl?fileKey=${encodeURIComponent(fileKey)}`;
+
     try {
-      const response = await fetch(`https://8a73bzipp6.execute-api.us-west-1.amazonaws.com/pdf-proxy?fileKey=${encodeURIComponent(fileKey)}`);
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch presigned URL");
+
       const presignedUrl = await response.text();
 
-      if (window.PDFViewerApplication) {
-        PDFViewerApplication.open(presignedUrl);
-      } else {
-        document.addEventListener("webviewerloaded", () => {
-          PDFViewerApplication.open(presignedUrl);
-        });
+      // Set the PDF viewer’s source to the secure presigned URL
+      const pdfViewer = document.getElementById("pdfViewer");
+      if (pdfViewer) {
+        pdfViewer.src = presignedUrl;
       }
     } catch (err) {
       console.error(err);
-      alert("Error loading PDF");
+      alert("Could not load the PDF");
     }
-  })();
+  }
+
+  window.addEventListener("DOMContentLoaded", loadPresignedPDF);
 </script>
   </body>
 </html>
