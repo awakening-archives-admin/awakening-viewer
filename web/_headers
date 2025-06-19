@@ -1,5 +1,6 @@
-/build/*.mjs
+/web/*.mjs
   Content-Type: application/javascript
 
-/build/*.js
+/web/*.js
   Content-Type: application/javascript
+
