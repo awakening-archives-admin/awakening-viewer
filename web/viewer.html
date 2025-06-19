@@ -2,71 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Secure PDF Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Viewer</title>
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
       height: 100%;
+      overflow: hidden;
       font-family: sans-serif;
     }
-    #viewerContainer {
-      height: 100vh;
-      overflow: auto;
-    }
-    .pdfViewer {
+    #pdfViewer {
       width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: #f8f8f8;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <div id="viewerContainer">
-    <div id="viewer" class="pdfViewer"></div>
-  </div>
+  <div id="pdfViewer"></div>
 
   <script type="module">
     import * as pdfjsLib from './build/pdf.mjs';
-    import * as pdfjsViewer from './build/pdf.viewer.mjs';
-    import workerSrc from './build/pdf.worker.mjs?worker';
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileUrl = urlParams.get('file');
 
-    async function loadPresignedPDF() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const presignedUrlEndpoint = urlParams.get('file');
-      if (!presignedUrlEndpoint) {
-        alert("Missing 'file' URL parameter.");
-        return;
-      }
-
-      try {
-        const res = await fetch(presignedUrlEndpoint);
-        const { url } = await res.json();
-
-        const container = document.getElementById('viewerContainer');
-        const eventBus = new pdfjsViewer.EventBus();
-        const pdfLinkService = new pdfjsViewer.PDFLinkService({ eventBus });
-
-        const pdfViewer = new pdfjsViewer.PDFViewer({
-          container,
-          eventBus,
-          linkService: pdfLinkService,
-        });
-
-        pdfLinkService.setViewer(pdfViewer);
-        const loadingTask = pdfjsLib.getDocument(url);
-        const pdfDocument = await loadingTask.promise;
-
-        pdfViewer.setDocument(pdfDocument);
-        pdfLinkService.setDocument(pdfDocument, null);
-      } catch (e) {
-        console.error("Error loading PDF:", e);
-        alert("Failed to load PDF.");
-      }
+    if (!fileUrl) {
+      document.getElementById('pdfViewer').textContent = 'Missing ?file= URL';
+      throw new Error('Missing file parameter');
     }
 
-    loadPresignedPDF();
+    // Setup worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
+
+    // Fetch and render
+    const loadingTask = pdfjsLib.getDocument(fileUrl);
+    loadingTask.promise.then(pdf => {
+      const container = document.getElementById('pdfViewer');
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        pdf.getPage(pageNum).then(page => {
+          const canvas = document.createElement('canvas');
+          container.appendChild(canvas);
+
+          const context = canvas.getContext('2d');
+          const viewport = page.getViewport({ scale: 1.5 });
+
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          page.render({ canvasContext: context, viewport });
+        });
+      }
+    }).catch(error => {
+      console.error('Error loading PDF:', error);
+      document.getElementById('pdfViewer').textContent = 'Error loading PDF.';
+    });
   </script>
 </body>
 </html>
