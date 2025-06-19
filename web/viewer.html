@@ -1,79 +1,58 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Secure PDF Viewer</title>
-  <link rel="stylesheet" href="https://unpkg.com/pdfjs-dist@3.11.174/web/pdf_viewer.css">
+  <meta charset="utf-8" />
+  <title>PDF Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./viewer.css" />
   <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-    }
-    #viewerContainer {
-      height: 100vh;
-      overflow: auto;
-    }
-    #toolbarContainer {
-      display: none; /* Hide toolbar */
+    #print, #download {
+      display: none !important;
     }
   </style>
 </head>
 <body>
-  <div id="viewerContainer" class="pdfViewer"></div>
+  <div id="outerContainer">
+    <div id="mainContainer">
+      <div class="pdfViewer singlePageView" id="viewer"></div>
+    </div>
+  </div>
 
-  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.mjs" type="module"></script>
   <script type="module">
-    import * as pdfjsLib from 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.mjs';
-    import { PDFViewer } from 'https://unpkg.com/pdfjs-dist@3.11.174/web/pdf_viewer.mjs';
+    import * as pdfjsLib from './build/pdf.mjs';
+    import { PDFViewer } from './web/pdf_viewer.mjs';
 
-    // Extract fileKey from query string
-    const params = new URLSearchParams(window.location.search);
-    const fileKey = params.get('file');
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileParam = urlParams.get('file');
 
-    if (!fileKey) {
-      document.body.innerHTML = '<p style="padding: 2em;">Missing file key in URL.</p>';
-      throw new Error("Missing file parameter");
+    if (!fileParam) {
+      document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:40px;">Missing PDF file URL.</h2>';
+      throw new Error('Missing file parameter in URL');
     }
 
-    // Build your Lambda endpoint
-    const lambdaURL = `https://8a73bzipp6.execute-api.us-west-1.amazonaws.com/GeneratePresignedUrl?fileKey=${encodeURIComponent(fileKey)}`;
+    // Fetch the presigned PDF URL from API Gateway
+    async function loadPresignedPDF() {
+      try {
+        const presignedFetch = await fetch(fileParam);
+        const presignedUrl = await presignedFetch.text();
 
-    // Request presigned URL
-    const getPresignedUrl = async () => {
-      const res = await fetch(lambdaURL);
-      if (!res.ok) throw new Error("Failed to get presigned URL");
-      const data = await res.json();
-      return data.url;
-    };
+        const loadingTask = pdfjsLib.getDocument(presignedUrl);
+        const pdfDocument = await loadingTask.promise;
 
-    const loadPDF = async () => {
-      const presignedUrl = await getPresignedUrl();
+        const eventBus = new pdfjsLib.EventBus();
+        const pdfViewer = new PDFViewer({
+          container: document.getElementById('viewer').parentNode,
+          eventBus: eventBus,
+        });
 
-      // Worker source
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.mjs';
+        pdfViewer.setDocument(pdfDocument);
+      } catch (err) {
+        console.error('Error loading PDF:', err);
+        document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:40px;">Failed to load PDF.</h2>';
+      }
+    }
 
-      const container = document.getElementById('viewerContainer');
-      const eventBus = new pdfjsLib.EventBus();
-
-      const pdfViewer = new PDFViewer({
-        container,
-        eventBus,
-      });
-
-      const loadingTask = pdfjsLib.getDocument({
-        url: presignedUrl,
-        disableStream: true,
-        disableAutoFetch: true
-      });
-
-      const pdfDocument = await loadingTask.promise;
-      pdfViewer.setDocument(pdfDocument);
-    };
-
-    loadPDF().catch(err => {
-      console.error(err);
-      document.body.innerHTML = `<p style="padding: 2em; color: red;">Error loading PDF.</p>`;
-    });
+    loadPresignedPDF();
   </script>
 </body>
 </html>
