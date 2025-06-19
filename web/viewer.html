@@ -1,52 +1,72 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>PDF Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="./viewer.css" />
+  <meta charset="UTF-8" />
+  <title>Secure PDF Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    #print, #download {
-      display: none !important;
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+    #viewerContainer {
+      height: 100vh;
+      overflow: auto;
+    }
+    .pdfViewer {
+      width: 100%;
     }
   </style>
 </head>
 <body>
-  <div id="viewerContainer" style="height: 100vh; overflow: auto;"></div>
+  <div id="viewerContainer">
+    <div id="viewer" class="pdfViewer"></div>
+  </div>
 
   <script type="module">
-  import * as pdfjsLib from './build/pdf.mjs';
-  import { PDFViewer } from './web/pdf_viewer.min.mjs'; // Adjust this if you later get the full UI build
+    import * as pdfjsLib from './build/pdf.mjs';
+    import * as pdfjsViewer from './build/pdf.viewer.mjs';
+    import workerSrc from './build/pdf.worker.mjs?worker';
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-  async function loadPDF(url) {
-    const loadingTask = pdfjsLib.getDocument(url);
-    const pdf = await loadingTask.promise;
-    const viewerContainer = document.getElementById('viewerContainer');
-    const viewer = new pdfjsLib.PDFViewer({
-      container: viewerContainer,
-    });
+    async function loadPresignedPDF() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const presignedUrlEndpoint = urlParams.get('file');
+      if (!presignedUrlEndpoint) {
+        alert("Missing 'file' URL parameter.");
+        return;
+      }
 
-    viewer.setDocument(pdf);
-  }
+      try {
+        const res = await fetch(presignedUrlEndpoint);
+        const { url } = await res.json();
 
-  // Get presigned URL from query param
-  const urlParams = new URLSearchParams(window.location.search);
-  const fileApi = urlParams.get('file');
+        const container = document.getElementById('viewerContainer');
+        const eventBus = new pdfjsViewer.EventBus();
+        const pdfLinkService = new pdfjsViewer.PDFLinkService({ eventBus });
 
-  if (fileApi) {
-    fetch(fileApi)
-      .then(res => res.text())
-      .then(presignedUrl => {
-        loadPDF(presignedUrl);
-      })
-      .catch(err => {
-        console.error('Failed to fetch presigned URL:', err);
-      });
-  } else {
-    console.error('Missing `file` parameter in URL');
-  }
-</script>
+        const pdfViewer = new pdfjsViewer.PDFViewer({
+          container,
+          eventBus,
+          linkService: pdfLinkService,
+        });
+
+        pdfLinkService.setViewer(pdfViewer);
+        const loadingTask = pdfjsLib.getDocument(url);
+        const pdfDocument = await loadingTask.promise;
+
+        pdfViewer.setDocument(pdfDocument);
+        pdfLinkService.setDocument(pdfDocument, null);
+      } catch (e) {
+        console.error("Error loading PDF:", e);
+        alert("Failed to load PDF.");
+      }
+    }
+
+    loadPresignedPDF();
+  </script>
 </body>
 </html>
