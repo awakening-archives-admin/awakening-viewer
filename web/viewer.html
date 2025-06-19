@@ -12,47 +12,41 @@
   </style>
 </head>
 <body>
-  <div id="outerContainer">
-    <div id="mainContainer">
-      <div class="pdfViewer singlePageView" id="viewer"></div>
-    </div>
-  </div>
+  <div id="viewerContainer" style="height: 100vh; overflow: auto;"></div>
 
   <script type="module">
-    import * as pdfjsLib from './build/pdf.mjs';
-    import { PDFViewer } from './web/pdf_viewer.mjs';
+  import * as pdfjsLib from './build/pdf.mjs';
+  import { PDFViewer } from './web/pdf_viewer.min.mjs'; // Adjust this if you later get the full UI build
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const fileParam = urlParams.get('file');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
 
-    if (!fileParam) {
-      document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:40px;">Missing PDF file URL.</h2>';
-      throw new Error('Missing file parameter in URL');
-    }
+  async function loadPDF(url) {
+    const loadingTask = pdfjsLib.getDocument(url);
+    const pdf = await loadingTask.promise;
+    const viewerContainer = document.getElementById('viewerContainer');
+    const viewer = new pdfjsLib.PDFViewer({
+      container: viewerContainer,
+    });
 
-    // Fetch the presigned PDF URL from API Gateway
-    async function loadPresignedPDF() {
-      try {
-        const presignedFetch = await fetch(fileParam);
-        const presignedUrl = await presignedFetch.text();
+    viewer.setDocument(pdf);
+  }
 
-        const loadingTask = pdfjsLib.getDocument(presignedUrl);
-        const pdfDocument = await loadingTask.promise;
+  // Get presigned URL from query param
+  const urlParams = new URLSearchParams(window.location.search);
+  const fileApi = urlParams.get('file');
 
-        const eventBus = new pdfjsLib.EventBus();
-        const pdfViewer = new PDFViewer({
-          container: document.getElementById('viewer').parentNode,
-          eventBus: eventBus,
-        });
-
-        pdfViewer.setDocument(pdfDocument);
-      } catch (err) {
-        console.error('Error loading PDF:', err);
-        document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:40px;">Failed to load PDF.</h2>';
-      }
-    }
-
-    loadPresignedPDF();
-  </script>
+  if (fileApi) {
+    fetch(fileApi)
+      .then(res => res.text())
+      .then(presignedUrl => {
+        loadPDF(presignedUrl);
+      })
+      .catch(err => {
+        console.error('Failed to fetch presigned URL:', err);
+      });
+  } else {
+    console.error('Missing `file` parameter in URL');
+  }
+</script>
 </body>
 </html>
