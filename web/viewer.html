@@ -25,6 +25,11 @@
   </style>
 </head>
 <body>
+  <body>
+  <header style="font-family: sans-serif; font-size: 1.5rem; text-align: center; padding: 20px;" id="pdf-title">
+    <!-- The PDF title will be inserted here -->
+  </header>
+
   <div id="pdfViewer"></div>
 
   <script type="module">
@@ -40,6 +45,33 @@
 
     // Setup worker
     pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
+
+    // --- Title Extraction Logic ---
+function extractFileNameFromPresignedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const fileKey = parsed.searchParams.get('fileKey');
+    if (!fileKey) return null;
+
+    const pathParts = fileKey.split('/');
+    const fileName = pathParts[pathParts.length - 1]; // e.g., Modifications of the Mind.pdf
+
+    // Remove file extension and decode
+    const baseName = decodeURIComponent(fileName.replace(/\.[^/.]+$/, ''));
+    return baseName;
+  } catch (e) {
+    console.error('Failed to extract title:', e);
+    return null;
+  }
+}
+
+const query = new URLSearchParams(window.location.search);
+const presignedUrl = query.get("file");
+
+const title = extractFileNameFromPresignedUrl(presignedUrl);
+if (title) {
+  document.getElementById('pdf-title').textContent = title;
+}
 
     // Fetch and render
     const loadingTask = pdfjsLib.getDocument(fileUrl);
