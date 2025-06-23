@@ -24,14 +24,19 @@
     }
   </style>
 </head>
-<body>
-  <body>
-  <header style="font-family: sans-serif; font-size: 1.5rem; text-align: center; padding: 20px;" id="pdf-title">
-    <!-- The PDF title will be inserted here -->
+<body style="margin: 0; font-family: sans-serif; background: #f9f9f9;">
+
+  <!-- Header -->
+  <header id="pdf-title" style="font-size: 1.8rem; font-weight: 600; text-align: center; padding: 24px 16px; background: #fff; border-bottom: 1px solid #ccc;">
+    <!-- Title dynamically inserted here -->
   </header>
 
-  <div id="pdfViewer"></div>
+  <!-- PDF Viewer Container -->
+  <main style="max-width: 960px; margin: 0 auto; padding: 24px;">
+    <div id="pdfViewer" style="box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: white; padding: 16px; border-radius: 8px;"></div>
+  </main>
 
+  <!-- PDF.js Script Module -->
   <script type="module">
     import * as pdfjsLib from './build/pdf.mjs';
 
@@ -46,34 +51,30 @@
     // Setup worker
     pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
 
-    // --- Title Extraction Logic ---
-function extractFileNameFromPresignedUrl(url) {
-  try {
-    const parsed = new URL(url);
-    const fileKey = parsed.searchParams.get('fileKey');
-    if (!fileKey) return null;
+    // Extract title from presigned URL
+    function extractFileNameFromPresignedUrl(url) {
+      try {
+        const parsed = new URL(url);
+        const fileKey = parsed.searchParams.get('fileKey');
+        if (!fileKey) return null;
 
-    const pathParts = fileKey.split('/');
-    const fileName = pathParts[pathParts.length - 1]; // e.g., Modifications of the Mind.pdf
+        const pathParts = fileKey.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        const baseName = decodeURIComponent(fileName.replace(/\.[^/.]+$/, ''));
+        return baseName;
+      } catch (e) {
+        console.error('Failed to extract title:', e);
+        return null;
+      }
+    }
 
-    // Remove file extension and decode
-    const baseName = decodeURIComponent(fileName.replace(/\.[^/.]+$/, ''));
-    return baseName;
-  } catch (e) {
-    console.error('Failed to extract title:', e);
-    return null;
-  }
-}
+    const presignedUrl = urlParams.get("file");
+    const title = extractFileNameFromPresignedUrl(presignedUrl);
+    if (title) {
+      document.getElementById('pdf-title').textContent = title;
+    }
 
-const query = new URLSearchParams(window.location.search);
-const presignedUrl = query.get("file");
-
-const title = extractFileNameFromPresignedUrl(presignedUrl);
-if (title) {
-  document.getElementById('pdf-title').textContent = title;
-}
-
-    // Fetch and render
+    // Render PDF
     const loadingTask = pdfjsLib.getDocument(fileUrl);
     loadingTask.promise.then(pdf => {
       const container = document.getElementById('pdfViewer');
@@ -81,6 +82,7 @@ if (title) {
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         pdf.getPage(pageNum).then(page => {
           const canvas = document.createElement('canvas');
+          canvas.style.marginBottom = '24px';
           container.appendChild(canvas);
 
           const context = canvas.getContext('2d');
@@ -97,5 +99,26 @@ if (title) {
       document.getElementById('pdfViewer').textContent = 'Error loading PDF.';
     });
   </script>
+
+  <!-- Print/Download Suppression -->
+  <script>
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    document.addEventListener('keydown', (e) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
+
+      if (
+        (ctrlOrCmd && e.key.toLowerCase() === 'p') ||
+        (ctrlOrCmd && e.key.toLowerCase() === 's') ||
+        (e.key === 'F12') ||
+        (ctrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'i')
+      ) {
+        e.preventDefault();
+      }
+    });
+  </script>
+
 </body>
+
 </html>
