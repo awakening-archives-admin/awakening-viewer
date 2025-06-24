@@ -1,74 +1,96 @@
 ﻿<!DOCTYPE html>
-
-<script type="module">
-  import * as pdfjsLib from './build/pdf.mjs';
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const fileUrl = urlParams.get('fileKey');
-
-    if (!fileUrl) {
-      document.getElementById('pdfViewer').textContent = 'Missing ?fileKey= URL';
-      throw new Error('Missing fileKey parameter');
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PDF Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      overflow-x: hidden;
     }
+    #pdfViewer canvas {
+      width: 100% !important;
+      height: auto !important;
+      display: block;
+      margin: 0 auto;
+    }
+    header#pdf-title {
+      font-size: 1.5rem;
+      text-align: center;
+      padding: 20px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <header id="pdf-title">
+    <!-- Title will appear here -->
+  </header>
+  <div id="pdfViewer" style="padding: 20px; max-width: 800px; margin: auto; overflow-y: auto;">
+    <!-- Pages rendered here -->
+  </div>
 
-    // Setup worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
+  <script type="module">
+    import * as pdfjsLib from './build/pdf.mjs';
 
-    // Title Extraction
-    function extractFileNameFromPresignedUrl(url) {
-      try {
-        const parsed = new URL(window.location.href);
-        const fileKey = parsed.searchParams.get('fileKey');
-        if (!fileKey) return null;
-        const pathParts = fileKey.split('/');
-        const fileName = pathParts[pathParts.length - 1];
-        const baseName = decodeURIComponent(fileName.replace(/\.[^/.]+$/, ''));
-        return baseName;
-      } catch (e) {
-        console.error('Failed to extract title:', e);
-        return null;
+    document.addEventListener("DOMContentLoaded", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fileUrl = urlParams.get('fileKey');
+
+      if (!fileUrl) {
+        document.getElementById('pdfViewer').textContent = 'Missing ?fileKey= URL';
+        throw new Error('Missing fileKey parameter');
       }
-    }
 
-    const title = extractFileNameFromPresignedUrl(fileUrl);
-    if (title) {
+      // Setup worker
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
+
+      // Title Extraction
+      function extractFileName(fileKey) {
+        const parts = fileKey.split('/');
+        const lastPart = parts[parts.length - 1];
+        return decodeURIComponent(lastPart.replace(/\.[^/.]+$/, ''));
+      }
+
+      const title = extractFileName(fileUrl);
       document.getElementById('pdf-title').textContent = title;
-    }
 
-    // Smart scaling
-    function getOptimalScale() {
-      const screenWidth = window.innerWidth;
-      if (screenWidth < 600) return 0.8;
-      if (screenWidth < 900) return 1.1;
-      return 1.5;
-    }
-
-    const loadingTask = pdfjsLib.getDocument(fileUrl);
-    loadingTask.promise.then(pdf => {
-      const container = document.getElementById('pdfViewer');
-
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        pdf.getPage(pageNum).then(page => {
-          const canvas = document.createElement('canvas');
-          canvas.style.display = 'block';
-          canvas.style.margin = '0 auto';
-          canvas.style.maxWidth = '100%';
-          container.appendChild(canvas);
-
-          const context = canvas.getContext('2d');
-          const viewport = page.getViewport({ scale: getOptimalScale() });
-
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-
-          page.render({ canvasContext: context, viewport });
-        });
+      // Smart scaling
+      function getOptimalScale() {
+        const screenWidth = window.innerWidth;
+        if (screenWidth < 600) return 0.8;
+        if (screenWidth < 900) return 1.1;
+        return 1.5;
       }
-    }).catch(error => {
-      console.error('Error loading PDF:', error);
-      document.getElementById('pdfViewer').textContent = 'Error loading PDF.';
-    });
-  });
-</script>
 
+      const loadingTask = pdfjsLib.getDocument(fileUrl);
+      loadingTask.promise.then(pdf => {
+        const container = document.getElementById('pdfViewer');
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          pdf.getPage(pageNum).then(page => {
+            const canvas = document.createElement('canvas');
+            canvas.style.display = 'block';
+            canvas.style.margin = '0 auto';
+            canvas.style.maxWidth = '100%';
+            container.appendChild(canvas);
+
+            const context = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: getOptimalScale() });
+
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            page.render({ canvasContext: context, viewport });
+          });
+        }
+      }).catch(error => {
+        console.error('Error loading PDF:', error);
+        document.getElementById('pdfViewer').textContent = 'Error loading PDF.';
+      });
+    });
+  </script>
+</body>
+</html>
