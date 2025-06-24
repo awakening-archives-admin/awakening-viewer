@@ -1,54 +1,51 @@
-﻿<script type="module">
+﻿<!DOCTYPE html>
+
+<script type="module">
   import * as pdfjsLib from './build/pdf.mjs';
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const fileKey = urlParams.get('fileKey');
+  document.addEventListener("DOMContentLoaded", () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileUrl = urlParams.get('fileKey');
 
-  if (!fileKey) {
-    document.getElementById('pdfViewer').textContent = 'Missing ?fileKey= URL';
-    throw new Error('Missing fileKey parameter');
-  }
-
-  // Setup worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
-
-  // Title Extraction
-  function extractFileNameFromFileKey(key) {
-    try {
-      const pathParts = key.split('/');
-      const fileName = pathParts[pathParts.length - 1];
-      const baseName = decodeURIComponent(fileName.replace(/\.[^/.]+$/, ''));
-      return baseName;
-    } catch (e) {
-      console.error('Failed to extract title:', e);
-      return null;
+    if (!fileUrl) {
+      document.getElementById('pdfViewer').textContent = 'Missing ?fileKey= URL';
+      throw new Error('Missing fileKey parameter');
     }
-  }
 
-  const title = extractFileNameFromFileKey(fileKey);
-  if (title) {
-    document.getElementById('pdf-title').textContent = title;
-  }
+    // Setup worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
 
-  // --- Smart Scale for Screen Size ---
-  function getOptimalScale() {
-    const screenWidth = window.innerWidth;
-    if (screenWidth < 600) return 0.8;
-    if (screenWidth < 900) return 1.1;
-    return 1.5; // default for desktop
-  }
+    // Title Extraction
+    function extractFileNameFromPresignedUrl(url) {
+      try {
+        const parsed = new URL(window.location.href);
+        const fileKey = parsed.searchParams.get('fileKey');
+        if (!fileKey) return null;
+        const pathParts = fileKey.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        const baseName = decodeURIComponent(fileName.replace(/\.[^/.]+$/, ''));
+        return baseName;
+      } catch (e) {
+        console.error('Failed to extract title:', e);
+        return null;
+      }
+    }
 
-  // Fetch presigned URL
-  const apiUrl = 'https://8a73bzipp6.execute-api.us-west-1.amazonaws.com/GeneratePresignedUrl';
-  const fetchUrl = `${apiUrl}?fileKey=${encodeURIComponent(fileKey)}`;
+    const title = extractFileNameFromPresignedUrl(fileUrl);
+    if (title) {
+      document.getElementById('pdf-title').textContent = title;
+    }
 
-  fetch(fetchUrl)
-    .then(response => response.json())
-    .then(data => {
-      const presignedUrl = data.url;
-      return pdfjsLib.getDocument(presignedUrl).promise;
-    })
-    .then(pdf => {
+    // Smart scaling
+    function getOptimalScale() {
+      const screenWidth = window.innerWidth;
+      if (screenWidth < 600) return 0.8;
+      if (screenWidth < 900) return 1.1;
+      return 1.5;
+    }
+
+    const loadingTask = pdfjsLib.getDocument(fileUrl);
+    loadingTask.promise.then(pdf => {
       const container = document.getElementById('pdfViewer');
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -68,9 +65,10 @@
           page.render({ canvasContext: context, viewport });
         });
       }
-    })
-    .catch(error => {
+    }).catch(error => {
       console.error('Error loading PDF:', error);
       document.getElementById('pdfViewer').textContent = 'Error loading PDF.';
     });
+  });
 </script>
+
