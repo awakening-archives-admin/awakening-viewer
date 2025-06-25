@@ -63,13 +63,14 @@
     document.getElementById('pdf-title').textContent = extractTitle(fileKey);
 
     // Fetch the presigned URL from Lambda
-    async function fetchPresignedUrl(fileKey) {
-      const endpoint = "https://8a73bzipp6.execute-api.us-west-1.amazonaws.com/$default/GeneratePresignedUrl";
-      const response = await fetch(`${endpoint}?fileKey=${encodeURIComponent(fileKey)}`);
-      if (!response.ok) throw new Error("Failed to get presigned URL");
-      const data = await response.json();
-      return data.url;
-    }
+async function fetchPresignedUrl(fileKey) {
+  const endpoint = "https://8a73bzipp6.execute-api.us-west-1.amazonaws.com/pdf-proxy";
+  const response = await fetch(`${endpoint}?fileKey=${encodeURIComponent(fileKey)}`);
+  if (!response.ok) throw new Error("Failed to get presigned URL");
+  const data = await response.json();
+  return data.url;
+}
+
 
     // Load and render the PDF
     fetchPresignedUrl(fileKey)
