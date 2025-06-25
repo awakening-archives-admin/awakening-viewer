@@ -81,7 +81,8 @@ async function fetchPresignedUrl(fileKey) {
         const container = document.getElementById('pdfViewer');
         container.innerHTML = '';
 
-        const scale = window.innerWidth < 600 ? 0.9 : window.innerWidth < 900 ? 1.1 : 1.5;
+        const scale = window.innerWidth < 600 ? 1.1 : window.innerWidth < 900 ? 1.5 : 2.0;
+
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           pdf.getPage(pageNum).then(page => {
